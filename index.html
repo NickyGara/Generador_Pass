@@ -21,6 +21,7 @@
   v00.02.001 — Favicon candado + watermark NickyGara
   v00.03.002 — Analizador: detección de patrones repetidos y secuencias + toggle ojo
   v00.03.003 — Guía de desarrollo embebida (este comentario)
+  v00.03.004 — Mobile: giroscopio + touch como cursor, lerp suavizado, botón permiso iOS
   ════════════════════════════════════════════════
 
   ────────────────────────────────────────────────
@@ -541,7 +542,7 @@
 <canvas id="particles-bg"></canvas>
 <div id="content">
 
-<div id="watermark"><span>NickyGara</span> · PassForge · v00.03.003</div>
+<div id="watermark"><span>NickyGara</span> · PassForge · v00.03.004</div>
 
 <h1>PassForge</h1>
 <p class="subtitle">generador + analizador de contraseñas</p>
@@ -1171,18 +1172,91 @@ randomizePlaceholders();
   resize();
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 100));
-  const mouse = { x: W() / 2, y: H() / 2 };
+
+  const mouse  = { x: W() / 2, y: H() / 2 };
+  const target = { x: W() / 2, y: H() / 2 }; // objetivo suavizado
+  const LERP   = 0.06; // suavidad del movimiento (0=inmóvil, 1=instantáneo)
+
   let clickImpulse = 0;
-  window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
-  window.addEventListener('touchmove', e => {
-    mouse.x = e.touches[0].clientX;
-    mouse.y = e.touches[0].clientY;
-  }, { passive: true });
+  const isMobile = () => window.matchMedia('(pointer:coarse)').matches;
+
+  // ── Desktop: mouse ──────────────────────────────────
+  window.addEventListener('mousemove', e => {
+    if (!isMobile()) { target.x = e.clientX; target.y = e.clientY; }
+  });
   window.addEventListener('mousedown', e => {
-    if (e.button === 0) clickImpulse =  1.8;
-    if (e.button === 2) clickImpulse = -1.8;
+    if (!isMobile()) {
+      if (e.button === 0) clickImpulse =  1.8;
+      if (e.button === 2) clickImpulse = -1.8;
+    }
   });
   window.addEventListener('contextmenu', e => e.preventDefault());
+
+  // ── Mobile: touch directo ────────────────────────────
+  window.addEventListener('touchmove', e => {
+    target.x = e.touches[0].clientX;
+    target.y = e.touches[0].clientY;
+  }, { passive: true });
+  window.addEventListener('touchstart', e => {
+    target.x = e.touches[0].clientX;
+    target.y = e.touches[0].clientY;
+    clickImpulse = 1.8;
+  }, { passive: true });
+
+  // ── Mobile: giroscopio ───────────────────────────────
+  let gyroActive = false;
+
+  function applyGyro(e) {
+    if (!isMobile()) return;
+    const gamma = Math.max(-45, Math.min(45, e.gamma || 0)); // izq/der −45..45
+    const beta  = Math.max(-20, Math.min(70,  e.beta  || 0)); // arriba/abajo
+    target.x = W() * (gamma + 45) / 90;
+    target.y = H() * (beta  + 20) / 90;
+    gyroActive = true;
+  }
+
+  function initGyro() {
+    if (typeof DeviceOrientationEvent === 'undefined') return;
+    // iOS 13+ requiere permiso explícito
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(state => {
+          if (state === 'granted') {
+            window.addEventListener('deviceorientation', applyGyro);
+            const btn = document.getElementById('gyro-btn');
+            if (btn) btn.remove();
+          }
+        })
+        .catch(() => {});
+    } else {
+      // Android y otros: sin permiso
+      window.addEventListener('deviceorientation', applyGyro);
+    }
+  }
+
+  // Botón de permiso iOS (solo aparece en móvil)
+  if (isMobile()) {
+    // Intentar sin permiso primero (Android)
+    window.addEventListener('deviceorientation', applyGyro, { once: true });
+    setTimeout(() => {
+      if (!gyroActive && typeof DeviceOrientationEvent?.requestPermission === 'function') {
+        const btn = document.createElement('button');
+        btn.id = 'gyro-btn';
+        btn.textContent = '⟳ Activar giroscopio';
+        btn.style.cssText = `
+          position:fixed; bottom:3rem; left:50%; transform:translateX(-50%);
+          z-index:10; background:rgba(200,241,53,0.12); border:1px solid #c8f135;
+          color:#c8f135; font-family:'JetBrains Mono',monospace; font-size:0.78rem;
+          padding:0.5rem 1.2rem; border-radius:999px; cursor:pointer;
+          letter-spacing:0.08em; backdrop-filter:blur(6px);
+        `;
+        btn.addEventListener('click', initGyro);
+        document.body.appendChild(btn);
+      } else if (!gyroActive) {
+        // Sin giroscopio: el touch ya actúa como cursor
+      }
+    }, 800);
+  }
   const N           = 260;
   const SPRING      = 0.022;   // más suave → atracción lenta
   const RADIAL_DAMP = 0.28;    // más fricción radial
@@ -1197,7 +1271,8 @@ randomizePlaceholders();
   let lastExplode     = Date.now() + 3000; // primera explosión a los 3s
 
   function triggerExplosion() {
-    const cx = mouse.x, cy = mouse.y;
+    const cx = isMobile() ? W() / 2 : mouse.x;
+    const cy = isMobile() ? H() / 2 : mouse.y;
     for (const p of particles) {
       const dx = p.x - cx, dy = p.y - cy;
       const d  = len(dx, dy);
@@ -1233,6 +1308,10 @@ randomizePlaceholders();
     return `rgba(${r|0},${g|0},${b|0},${a.toFixed(2)})`;
   }
   function update() {
+    // Lerp: mouse sigue suavemente al target
+    mouse.x += (target.x - mouse.x) * LERP;
+    mouse.y += (target.y - mouse.y) * LERP;
+
     const now = Date.now();
     if (now - lastExplode >= EXPLODE_EVERY) {
       triggerExplosion();
