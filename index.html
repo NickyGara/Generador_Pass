@@ -637,6 +637,17 @@ function applyLeet(word) {
   return chars.join('');
 }
 
+function randomCase(word) {
+  const chars = word.split('');
+  const letterIdxs = chars.reduce((acc, c, i) => { if (/[a-zA-Z]/.test(c)) acc.push(i); return acc; }, []);
+  if (letterIdxs.length === 0) return word;
+  const howMany = rand(1, Math.max(1, Math.floor(letterIdxs.length / 2)));
+  shuffleArray(letterIdxs).slice(0, howMany).forEach(i => {
+    chars[i] = chars[i].toUpperCase();
+  });
+  return chars.join('');
+}
+
 function buildPassword(words, targetMin, targetMax) {
   const symsAvail = [...SYMBOLS, ...EXTRA_SYMS];
   const cleanWords = words.filter(w => w.trim().length > 0).map(w => w.trim().toLowerCase());
@@ -649,7 +660,7 @@ function buildPassword(words, targetMin, targetMax) {
   let selectedWords = wordPool.slice(0, usedCount);
 
   if (opts.leet) selectedWords = selectedWords.map(w => applyLeet(w));
-
+  selectedWords = selectedWords.map(w => randomCase(w));
   const sepCount = selectedWords.length - 1;
   const seps = Array.from({length: sepCount}, () => {
     if (opts.sym && opts.num && Math.random() > 0.5) return pick(symsAvail) + String(rand(0,9));
@@ -711,6 +722,7 @@ function buildPasswordCoded(words, targetMin, targetMax) {
   const target = rand(targetMin, targetMax);
   let selectedWords = shuffleArray([...cleanWords]).slice(0, Math.min(cleanWords.length, 3));
   if (opts.leet) selectedWords = selectedWords.map(w => applyLeet(w));
+  selectedWords = selectedWords.map(w => randomCase(w));
 
   function makeCode(len) {
     let s = '';
