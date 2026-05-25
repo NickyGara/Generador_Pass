@@ -1,9 +1,33 @@
+<!--
+  PassForge — by NickyGara
+  ════════════════════════════════════════════════
+  ESQUEMA DE VERSIONES: vXX.YY.ZZZ
+
+  ZZZ → cambios estéticos / visuales (fondos, colores, layout, favicon, watermark)
+  YY  → cambios en el generador o analizador (lógica, inputs, algoritmos)
+  XX  → cambios mayores que afectan la gran mayoría del programa
+          └─ único caso que resetea YY y ZZZ a 000
+
+  ZZZ e YY avanzan de forma INDEPENDIENTE entre sí.
+  Solo XX resetea todo al subir.
+
+  Historial:
+  v00.01.000 — Generador base + analizador de fortaleza
+  v00.01.001 — Tabla de entropía + veredicto contextual
+  v00.01.002 — Fix botón copiar (fallback execCommand para file://)
+  v00.01.003 — Fondo animado de partículas
+  v00.01.004 — Paredes suaves (WALL_MARGIN / WALL_FORCE)
+  v00.02.000 — Mayúsculas aleatorias en palabras (randomCase)
+  v00.02.001 — Favicon candado + watermark NickyGara
+  ════════════════════════════════════════════════
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Generador de Contraseñas</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMzIgMzIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0iIzBlMGUxMCIvPgogIDxyZWN0IHg9IjciIHk9IjE2IiB3aWR0aD0iMTgiIGhlaWdodD0iMTMiIHJ4PSIzIiBmaWxsPSIjYzhmMTM1Ii8+CiAgPGNpcmNsZSBjeD0iMTYiIGN5PSIyMiIgcj0iMi4yIiBmaWxsPSIjMGUwZTEwIi8+CiAgPHJlY3QgeD0iMTQuOCIgeT0iMjIiIHdpZHRoPSIyLjQiIGhlaWdodD0iMy41IiByeD0iMSIgZmlsbD0iIzBlMGUxMCIvPgogIDxwYXRoIGQ9Ik0xMiAxNyBMMTIgMTMgUTEyIDYgMTYgNiBRMjEgNiAyMSAxMSBMMjEgMTciIHN0cm9rZT0iI2M4ZjEzNSIgc3Ryb2tlLXdpZHRoPSIyLjgiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxyZWN0IHg9IjgiIHk9IjEzIiB3aWR0aD0iNiIgaGVpZ2h0PSI1IiBmaWxsPSIjMGUwZTEwIi8+Cjwvc3ZnPg==">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;500;700;800&display=swap">
 <style>
@@ -397,11 +421,29 @@
     position: relative;
     z-index: 1;
   }
+  #watermark {
+    position: fixed;
+    bottom: 0.75rem;
+    right: 1rem;
+    z-index: 2;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: rgba(107,107,114,0.45);
+    letter-spacing: 0.08em;
+    user-select: none;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  #watermark span { color: rgba(200,241,53,0.3); font-weight: 700; }
 </style>
 </head>
 <body>
 <canvas id="particles-bg"></canvas>
 <div id="content">
+
+<div id="watermark"><span>NickyGara</span> · PassForge · v00.02.001</div>
 
 <h1>PassForge</h1>
 <p class="subtitle">generador + analizador de contraseñas</p>
