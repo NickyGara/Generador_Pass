@@ -1100,6 +1100,8 @@ function analyzePassword() {
   const lowerPwd = pwd.toLowerCase();
   const noCommon = !COMMON_WORDS.some(w => lowerPwd.includes(w));
 
+  const si = strengthInfo(pwd);
+
   const crits = [
     ['c-len', len >= 12],
     ['c-upper', hasUpper],
@@ -1117,7 +1119,6 @@ function analyzePassword() {
     el.classList.toggle('fail', !pass);
   });
 
-  const si = strengthInfo(pwd);
   document.getElementById('big-score').textContent = si.score + '%';
   document.getElementById('big-score').style.color = si.color;
   document.getElementById('big-label').textContent = si.label;
@@ -1170,6 +1171,7 @@ randomizePlaceholders();
   }
   resize();
   window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => setTimeout(resize, 100));
   const mouse = { x: W() / 2, y: H() / 2 };
   let clickImpulse = 0;
   window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
@@ -1261,7 +1263,10 @@ randomizePlaceholders();
     clickImpulse = 0;
   }
   function draw() {
-    ctx.clearRect(0, 0, W(), H());
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
     ctx.beginPath();
     ctx.arc(mouse.x, mouse.y, 3, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(200,241,53,0.4)';
