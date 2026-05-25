@@ -19,6 +19,104 @@
   v00.01.004 — Paredes suaves (WALL_MARGIN / WALL_FORCE)
   v00.02.000 — Mayúsculas aleatorias en palabras (randomCase)
   v00.02.001 — Favicon candado + watermark NickyGara
+  v00.03.002 — Analizador: detección de patrones repetidos y secuencias + toggle ojo
+  v00.03.003 — Guía de desarrollo embebida (este comentario)
+  ════════════════════════════════════════════════
+
+  ────────────────────────────────────────────────
+  GUÍA PARA DESARROLLADORES
+  ────────────────────────────────────────────────
+
+  ESTRUCTURA GENERAL DEL ARCHIVO
+  ├── <head>
+  │   ├── Estilos CSS (variables, componentes, layout)
+  │   └── Favicon embebido como base64 en <link rel="icon">
+  ├── <body>
+  │   ├── #particles-bg  → canvas del fondo animado (z-index: 0)
+  │   ├── #content       → todo el contenido visible (z-index: 1)
+  │   │   ├── #watermark → versión + autor, fijo abajo a la derecha
+  │   │   ├── .tabs      → navegación entre "Generar" y "Analizar"
+  │   │   ├── #tab-gen   → panel del generador de contraseñas
+  │   │   └── #tab-test  → panel del analizador
+  │   ├── <script> principal → lógica del generador y analizador
+  │   └── <script> partículas → animación del fondo (al final del body)
+
+  ────────────────────────────────────────────────
+  CÓMO MODIFICAR EL GENERADOR
+  ────────────────────────────────────────────────
+  Las constantes de configuración están al inicio del <script> principal:
+
+    SYMBOLS      → símbolos usados como separadores y relleno
+    EXTRA_SYMS   → símbolos adicionales (menos comunes)
+    LEET_MAP     → tabla de sustitución letra→número (A=4, E=3, etc.)
+    COMMON_WORDS → lista de palabras comunes para el analizador
+    RANGES       → rangos de longitud [[8,12],[12,16],[16,32]]
+
+  Para agregar un nuevo rango de contraseña:
+    1. Agregá [min, max] al array RANGES
+    2. Copiá un bloque .pwd-card y .strength-area en #tab-gen, incrementando el índice
+    3. El loop RANGES.forEach en generate() lo procesará automáticamente
+
+  Para cambiar la lógica de generación:
+    · buildPassword()      → contraseñas 1 y 3 (palabras + separadores + relleno)
+    · buildPasswordCoded() → contraseña 2 (palabras intercaladas con códigos)
+    · applyLeet()          → sustitución letra→número en posiciones aleatorias
+    · randomCase()         → capitalización aleatoria de letras
+
+  ────────────────────────────────────────────────
+  CÓMO MODIFICAR EL ANALIZADOR
+  ────────────────────────────────────────────────
+  · computeEntropy(pwd)           → entropía cruda (length × log2(charset))
+  · detectRepeatedPattern(pwd)    → detecta unidad mínima repetida (ej: XyzXyz)
+  · detectLongestSequentialRun()  → detecta rachas secuenciales (ej: 12345678)
+  · strengthInfo(pwd)             → aplica penalizaciones y devuelve score/label/color
+
+  Para agregar un nuevo criterio de seguridad:
+    1. Calculá el booleano en analyzePassword()
+       Ej: const noEspacios = !/\s/.test(pwd)
+    2. Agregalo al array crits: ['c-nuevo', noEspacios]
+    3. Agregá el elemento en #criteria-list:
+       <div class="criterion fail" id="c-nuevo">
+         <span class="crit-icon">✓</span> Descripción del criterio
+       </div>
+
+  ────────────────────────────────────────────────
+  CÓMO MODIFICAR EL FONDO ANIMADO
+  ────────────────────────────────────────────────
+  El script de partículas está al final del <body> (segundo <script>).
+  Constantes editables:
+
+    N            → cantidad de partículas (default: 260)
+    SPRING       → fuerza de atracción al radio preferido
+    RADIAL_DAMP  → amortiguación en dirección radial
+    FULL_DAMP    → amortiguación global (más alto = más lento)
+    NOISE        → aleatoriedad de movimiento
+    SEP_DIST     → distancia mínima entre partículas
+    SEP_FORCE    → fuerza de repulsión entre partículas
+    WALL_MARGIN  → zona de repulsión cerca de los bordes (px)
+    WALL_FORCE   → intensidad de la repulsión en los bordes
+
+  Para cambiar los colores de las partículas, editá getColor(dist):
+    Recibe la distancia al cursor y devuelve un string rgba().
+    t=0 → cerca del cursor, t=1 → lejos. Interpolá los colores a gusto.
+
+  ────────────────────────────────────────────────
+  CÓMO ACTUALIZAR EL FAVICON
+  ────────────────────────────────────────────────
+  1. Diseñá el SVG (recomendado: viewBox="0 0 32 32")
+  2. Convertilo a base64:
+       python3 -c "import base64; print(base64.b64encode(open('icon.svg','rb').read()).decode())"
+     o usá: https://www.base64encode.org/
+  3. Reemplazá el href en:
+       <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,...">
+
+  ────────────────────────────────────────────────
+  CÓMO ACTUALIZAR LA VERSIÓN Y EL WATERMARK
+  ────────────────────────────────────────────────
+  1. Determiná qué posición corresponde al cambio (ZZZ / YY / XX)
+  2. Incrementá esa posición en el watermark del body:
+       <div id="watermark"><span>NickyGara</span> · PassForge · vXX.YY.ZZZ</div>
+  3. Agregá una línea al historial en este comentario
   ════════════════════════════════════════════════
 -->
 <!DOCTYPE html>
@@ -443,7 +541,7 @@
 <canvas id="particles-bg"></canvas>
 <div id="content">
 
-<div id="watermark"><span>NickyGara</span> · PassForge · v00.02.001</div>
+<div id="watermark"><span>NickyGara</span> · PassForge · v00.03.003</div>
 
 <h1>PassForge</h1>
 <p class="subtitle">generador + analizador de contraseñas</p>
@@ -525,9 +623,14 @@
 <div id="tab-test" class="tab-panel">
   <div class="tester-wrap">
     <div class="tester-input-row">
-      <div style="flex:1; display:flex; flex-direction:column; gap:0.3rem;">
+      <div style="flex:1; display:flex; flex-direction:column; gap:0.3rem; position:relative;">
         <label>contraseña a analizar</label>
-        <input type="password" id="tester-input" placeholder="pegá o escribí la contraseña" oninput="analyzePassword()" autocomplete="off">
+        <div style="position:relative;">
+          <input type="password" id="tester-input" placeholder="pegá o escribí la contraseña" oninput="analyzePassword()" autocomplete="off" style="padding-right:2.5rem;">
+          <button id="eye-btn" onclick="toggleEye()" title="Mostrar/ocultar" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem;display:flex;align-items:center;transition:color 0.15s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">
+            <svg id="eye-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" width="18" height="18"><path d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="10" cy="10" r="2.5"/></svg>
+          </button>
+        </div>
       </div>
       <button class="clear-btn" onclick="clearTester()">limpiar</button>
     </div>
@@ -559,6 +662,8 @@
       <div class="criterion fail" id="c-sym"><span class="crit-icon">✓</span> Símbolos especiales</div>
       <div class="criterion fail" id="c-norepeat"><span class="crit-icon">✓</span> Sin repetición excesiva de chars</div>
       <div class="criterion fail" id="c-nodict"><span class="crit-icon">✓</span> Sin palabras comunes detectadas</div>
+      <div class="criterion fail" id="c-noseq"><span class="crit-icon">✓</span> Sin secuencias largas (123…, abc…)</div>
+      <div class="criterion fail" id="c-norep"><span class="crit-icon">✓</span> Sin patrón repetido (XyzXyzXyz…)</div>
     </div>
 
     <div class="big-strength" id="big-strength">
@@ -802,16 +907,55 @@ function computeEntropy(pwd) {
   return cs > 0 ? Math.round(pwd.length * Math.log2(cs)) : 0;
 }
 
+function detectRepeatedPattern(pwd) {
+  const n = pwd.length;
+  const lower = pwd.toLowerCase();
+  for (let len = 1; len <= Math.floor(n / 2); len++) {
+    const unit = lower.slice(0, len);
+    let reps = 0;
+    let i = 0;
+    while (i + len <= n && lower.slice(i, i + len) === unit) { reps++; i += len; }
+    if (reps >= 2 && i >= n - len + 1) return { found: true, unit, times: reps };
+  }
+  return { found: false };
+}
+
+function detectLongestSequentialRun(pwd) {
+  let maxRun = 1, cur = 1;
+  for (let i = 1; i < pwd.length; i++) {
+    const d = pwd.charCodeAt(i) - pwd.charCodeAt(i - 1);
+    if (d === 1 || d === -1) { cur++; maxRun = Math.max(maxRun, cur); }
+    else cur = 1;
+  }
+  return maxRun;
+}
+
 function strengthInfo(pwd) {
-  const entropy = computeEntropy(pwd);
+  let entropy = computeEntropy(pwd);
   const len = pwd.length;
+
+  const rep = detectRepeatedPattern(pwd);
+  const seqRun = detectLongestSequentialRun(pwd);
+
+  // Penalizaciones sobre entropía efectiva
+  if (rep.found) {
+    // Entropía real ≈ la de la unidad repetida, no del total
+    const unitEntropy = computeEntropy(rep.unit) || 1;
+    entropy = Math.round(unitEntropy * (1 + Math.log2(rep.times)));
+  }
+  if (seqRun >= 4) {
+    const penalty = seqRun >= 8 ? 0.35 : seqRun >= 6 ? 0.55 : 0.75;
+    entropy = Math.round(entropy * penalty);
+  }
+
   let score, label, color;
-  if (len < 4 || entropy < 20) { score = 5; label = 'Muy débil'; color = '#ff4e4e'; }
-  else if (entropy < 40) { score = 25; label = 'Débil'; color = '#ff7a45'; }
-  else if (entropy < 60) { score = 50; label = 'Moderada'; color = '#ffb445'; }
-  else if (entropy < 80) { score = 75; label = 'Fuerte'; color = '#4ecb71'; }
-  else { score = 100; label = 'Muy fuerte'; color = '#c8f135'; }
-  return { score, label, color, entropy };
+  if (len < 4 || entropy < 20) { score = 5;   label = 'Muy débil'; color = '#ff4e4e'; }
+  else if (entropy < 40)        { score = 25;  label = 'Débil';     color = '#ff7a45'; }
+  else if (entropy < 60)        { score = 50;  label = 'Moderada';  color = '#ffb445'; }
+  else if (entropy < 80)        { score = 75;  label = 'Fuerte';    color = '#4ecb71'; }
+  else                          { score = 100; label = 'Muy fuerte';color = '#c8f135'; }
+
+  return { score, label, color, entropy, rep, seqRun };
 }
 
 function generate() {
@@ -887,6 +1031,16 @@ function toggleChip(el, key) {
   el.classList.toggle('on', opts[key]);
 }
 
+function toggleEye() {
+  const inp = document.getElementById('tester-input');
+  const icon = document.getElementById('eye-icon');
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  icon.innerHTML = show
+    ? '<path d="M3 3l14 14M8.5 8.6A4.5 4.5 0 0 0 10 14.5a4.5 4.5 0 0 0 4.5-4.5 4.5 4.5 0 0 0-.6-2.2M6.3 6.4C3.6 7.8 1 10 1 10s3.5 6 9 6c1.8 0 3.4-.5 4.7-1.3M10 5.5c4.1.3 7.3 4 8.5 4.5 0 0-.8 1.5-2 2.8"/>'
+    : '<path d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="10" cy="10" r="2.5"/>';
+}
+
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b,i) => {
     b.classList.toggle('active', ['gen','test'][i] === name);
@@ -954,6 +1108,8 @@ function analyzePassword() {
     ['c-sym', hasSym],
     ['c-norepeat', noExcessRepeat],
     ['c-nodict', noCommon],
+    ['c-noseq', si.seqRun < 4],
+    ['c-norep', !si.rep.found],
   ];
   crits.forEach(([id, pass]) => {
     const el = document.getElementById(id);
