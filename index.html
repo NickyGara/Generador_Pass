@@ -979,6 +979,8 @@ randomizePlaceholders();
   const NOISE       = 0.06;
   const SEP_DIST    = 18;
   const SEP_FORCE   = 0.5;
+  const WALL_MARGIN = 80;
+  const WALL_FORCE  = 0.012;
   function rnd(a, b) { return a + Math.random() * (b - a); }
   function len(x, y) { return Math.sqrt(x * x + y * y) || 0.0001; }
   const particles = Array.from({ length: N }, () => {
@@ -1041,10 +1043,10 @@ randomizePlaceholders();
       p.x += p.vx;
       p.y += p.vy;
       const w = W(), h = H();
-      if (p.x < -20)    p.x = w + 20;
-      if (p.x > w + 20) p.x = -20;
-      if (p.y < -20)    p.y = h + 20;
-      if (p.y > h + 20) p.y = -20;
+      if (p.x < WALL_MARGIN)      p.vx += (WALL_MARGIN - p.x)       * WALL_FORCE;
+      if (p.x > w - WALL_MARGIN)  p.vx -= (p.x - (w - WALL_MARGIN)) * WALL_FORCE;
+      if (p.y < WALL_MARGIN)      p.vy += (WALL_MARGIN - p.y)       * WALL_FORCE;
+      if (p.y > h - WALL_MARGIN)  p.vy -= (p.y - (h - WALL_MARGIN)) * WALL_FORCE;
     }
     clickImpulse = 0;
   }
