@@ -959,16 +959,15 @@ function strengthInfo(pwd) {
 }
 
 function generate() {
-  const w1 = document.getElementById('w1').value;
-  const w2 = document.getElementById('w2').value;
-  const w3 = document.getElementById('w3').value;
-  const words = [w1, w2, w3].filter(w => w.trim().length > 0);
-  if (words.length === 0) {
-    [0,1,2].forEach(i => {
-      document.getElementById('pv-'+i).textContent = 'ingresá al menos una palabra';
-      document.getElementById('pv-'+i).className = 'pwd-value empty';
-    });
-    return;
+  const inputs = ['w1','w2','w3'].map(id => document.getElementById(id));
+  const typed = inputs.map(el => el.value.trim()).filter(v => v.length > 0);
+
+  let words;
+  if (typed.length === 0) {
+    // Sin palabras ingresadas: usar los placeholders actuales
+    words = inputs.map(el => el.placeholder.replace(/^ej:\s*/i, '').trim());
+  } else {
+    words = typed;
   }
 
   RANGES.forEach(([mn, mx], i) => {
@@ -1185,14 +1184,28 @@ randomizePlaceholders();
   });
   window.addEventListener('contextmenu', e => e.preventDefault());
   const N           = 260;
-  const SPRING      = 0.04;
-  const RADIAL_DAMP = 0.18;
-  const FULL_DAMP   = 0.04;
-  const NOISE       = 0.06;
+  const SPRING      = 0.022;   // más suave → atracción lenta
+  const RADIAL_DAMP = 0.28;    // más fricción radial
+  const FULL_DAMP   = 0.09;    // más viscosidad global
+  const NOISE       = 0.018;   // menos jitter eléctrico
   const SEP_DIST    = 18;
-  const SEP_FORCE   = 0.5;
-  const WALL_MARGIN = 80;
-  const WALL_FORCE  = 0.012;
+  const SEP_FORCE   = 0.35;    // separación más suave
+  const WALL_MARGIN   = 80;
+  const WALL_FORCE    = 0.012;
+  const EXPLODE_EVERY = 9000;   // ms entre explosiones
+  const EXPLODE_FORCE = 14;     // velocidad de salida
+  let lastExplode     = Date.now() + 3000; // primera explosión a los 3s
+
+  function triggerExplosion() {
+    const cx = mouse.x, cy = mouse.y;
+    for (const p of particles) {
+      const dx = p.x - cx, dy = p.y - cy;
+      const d  = len(dx, dy);
+      const falloff = 1 + 120 / d;          // más fuerza cerca del centro
+      p.vx += (dx / d) * EXPLODE_FORCE * falloff * rnd(0.6, 1.4);
+      p.vy += (dy / d) * EXPLODE_FORCE * falloff * rnd(0.6, 1.4);
+    }
+  }
   function rnd(a, b) { return a + Math.random() * (b - a); }
   function len(x, y) { return Math.sqrt(x * x + y * y) || 0.0001; }
   const particles = Array.from({ length: N }, () => {
@@ -1220,6 +1233,11 @@ randomizePlaceholders();
     return `rgba(${r|0},${g|0},${b|0},${a.toFixed(2)})`;
   }
   function update() {
+    const now = Date.now();
+    if (now - lastExplode >= EXPLODE_EVERY) {
+      triggerExplosion();
+      lastExplode = now;
+    }
     for (const p of particles) { p.fx = 0; p.fy = 0; }
     for (let i = 0; i < N; i++) {
       for (let j = i + 1; j < N; j++) {
@@ -1252,6 +1270,11 @@ randomizePlaceholders();
       p.vy -= RADIAL_DAMP * radialV * ry;
       p.vx = p.vx * (1 - FULL_DAMP) + (Math.random() - 0.5) * NOISE;
       p.vy = p.vy * (1 - FULL_DAMP) + (Math.random() - 0.5) * NOISE;
+      // Cap de velocidad → evita picos bruscos
+      const maxV = 6;
+      const spd = len(p.vx, p.vy);
+      if (spd > maxV) { p.vx = (p.vx / spd) * maxV; p.vy = (p.vy / spd) * maxV; }
+
       p.x += p.vx;
       p.y += p.vy;
       const w = W(), h = H();
@@ -1276,12 +1299,15 @@ randomizePlaceholders();
       const dist  = len(dx, dy);
       const angle = Math.atan2(p.vy, p.vx);
       const speed = len(p.vx, p.vy);
-      const pw    = 1.8 + speed * 0.9;
+      const pw    = 2.5 + speed * 1.8;   // más ancho y estela más larga
+      const ph    = 1.6;                  // grosor base mayor
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(angle);
       ctx.fillStyle = getColor(dist);
-      ctx.fillRect(-pw / 2, -0.9, pw, 1.8);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, pw / 2, ph / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
   }
