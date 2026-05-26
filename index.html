@@ -1175,7 +1175,7 @@ randomizePlaceholders();
 
   const mouse  = { x: W() / 2, y: H() / 2 };
   const target = { x: W() / 2, y: H() / 2 }; // objetivo suavizado
-  const LERP   = 0.06; // suavidad del movimiento (0=inmóvil, 1=instantáneo)
+  const LERP   = 1; // suavidad del movimiento (0=inmóvil, 1=instantáneo)
 
   let clickImpulse = 0;
   const isMobile = () => window.matchMedia('(pointer:coarse)').matches;
