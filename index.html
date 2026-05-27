@@ -1186,8 +1186,8 @@ randomizePlaceholders();
   });
   window.addEventListener('mousedown', e => {
     if (!isMobile()) {
-      if (e.button === 0) clickImpulse =  1.8;
-      if (e.button === 2) clickImpulse = -1.8;
+      if (e.button === 0) clickImpulse =  3;
+      if (e.button === 2) clickImpulse = -3;
     }
   });
   window.addEventListener('contextmenu', e => e.preventDefault());
@@ -1257,7 +1257,7 @@ randomizePlaceholders();
       }
     }, 800);
   }
-  const N           = 400;
+  const N           = 800;
   const SPRING      = 0.022;   // más suave → atracción lenta
   const RADIAL_DAMP = 0.28;    // más fricción radial
   const FULL_DAMP   = 0.09;    // más viscosidad global
